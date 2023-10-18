@@ -88,6 +88,7 @@ parser.add_argument('--settings', type=str, help='Load the default interface set
 parser.add_argument('--extensions', type=str, nargs="+", help='The list of extensions to load. If you want to load more than one extension, write the names separated by spaces.')
 parser.add_argument('--verbose', action='store_true', help='Print the prompts to the terminal.')
 parser.add_argument('--chat-buttons', action='store_true', help='Show buttons on chat tab instead of hover menu.')
+parser.add_argument('--use-ipex', action='store_true', help='Use Intel PyTorch Extension (IPEX) for optimized performance on Intel hardware.')
 
 # Model loader
 parser.add_argument('--loader', type=str, help='Choose the model loader manually, otherwise, it will get autodetected. Valid options: transformers, autogptq, gptq-for-llama, exllama, exllama_hf, llamacpp, rwkv')

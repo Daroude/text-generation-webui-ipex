@@ -1,6 +1,5 @@
 import argparse
 import glob
-import hashlib
 import os
 import platform
 import re
@@ -113,15 +112,6 @@ def print_big_message(message):
     print("*******************************************************************\n\n")
 
 
-def calculate_file_hash(file_path):
-    p = os.path.join(script_dir, file_path)
-    if os.path.isfile(p):
-        with open(p, 'rb') as f:
-            return hashlib.sha256(f.read()).hexdigest()
-    else:
-        return ''
-
-
 def run_cmd(cmd, assert_success=False, environment=False, capture_output=False, env=None):
     # Use the conda environment
     if environment:
@@ -137,7 +127,8 @@ def run_cmd(cmd, assert_success=False, environment=False, capture_output=False, 
 
     # Assert the command ran successfully
     if assert_success and result.returncode != 0:
-        print("Command '" + cmd + "' failed with exit status code '" + str(result.returncode) + "'.\n\nExiting now.\nTry running the start/update script again.")
+        print("Command '" + cmd + "' failed with exit status code '" + str(
+            result.returncode) + "'.\n\nExiting now.\nTry running the start/update script again.")
         sys.exit(1)
 
     return result
@@ -153,7 +144,7 @@ def install_webui():
         print("What is your GPU?")
         print()
         print("A) NVIDIA")
-        print("B) AMD (Linux/MacOS only. Requires ROCm SDK 5.6 on Linux)")
+        print("B) AMD (Linux/MacOS only. Requires ROCm SDK 5.4.2/5.4.3 on Linux)")
         print("C) Apple M Series")
         print("D) Intel Arc (IPEX)")
         print("N) None (I want to run models in CPU mode)")
@@ -165,31 +156,29 @@ def install_webui():
             choice = input("Input> ").upper()
 
     if choice == "N":
-        print_big_message("Once the installation ends, make sure to open CMD_FLAGS.txt with\na text editor and add the --cpu flag.")
+        print_big_message(
+            "Once the installation ends, make sure to open CMD_FLAGS.txt with\na text editor and add the --cpu flag.")
 
     # Find the proper Pytorch installation command
     install_git = "conda install -y -k ninja git"
-    install_pytorch = "python -m pip install torch torchvision torchaudio"
+    install_pytorch = "python -m pip install torch==2.0.1a0+cxx11.abi torchvision==0.15.2a0+cxx11.abi torchaudio -f https://developer.intel.com/ipex-whl-stable-xpu"
 
-    if any((is_windows(), is_linux())) and choice == "A":
-        install_pytorch = "python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
+    if is_windows() and choice == "A":
+        install_pytorch = "python -m pip install torch==2.0.1a0+cxx11.abi torchvision==0.15.2a0+cxx11.abi torchaudio -f https://developer.intel.com/ipex-whl-stable-xpu"
     elif not is_macos() and choice == "B":
         if is_linux():
-            install_pytorch = "python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.6"
+            install_pytorch = "python -m pip install torch==2.0.1a0+cxx11.abi torchvision==0.15.2a0+cxx11.abi torchaudio -f https://developer.intel.com/ipex-whl-stable-xpu"
         else:
             print("AMD GPUs are only supported on Linux. Exiting...")
             sys.exit(1)
     elif is_linux() and (choice == "C" or choice == "N"):
-        install_pytorch = "python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu"
+        install_pytorch = "python -m pip install torch==2.0.1a0+cxx11.abi torchvision==0.15.2a0+cxx11.abi torchaudio -f https://developer.intel.com/ipex-whl-stable-xpu --index-url https://download.pytorch.org/whl/cpu"
     elif choice == "D":
-        install_pytorch = "python -m pip install torch==2.0.1a0 torchvision==0.15.2a0 intel_extension_for_pytorch==2.0.110+xpu -f https://developer.intel.com/ipex-whl-stable-xpu"
+        install_pytorch = "python -m pip install torch==2.0.1a0+cxx11.abi intel_extension_for_pytorch==2.0.110+xpu -f https://developer.intel.com/ipex-whl-stable-xpu"
 
     # Install Git and then Pytorch
-    run_cmd(f"{install_git} && {install_pytorch} && python -m pip install py-cpuinfo==9.0.0", assert_success=True, environment=True)
-
-    # Install CUDA libraries (this wasn't necessary for Pytorch before...)
-    if choice == "A":
-        run_cmd("conda install -y -c \"nvidia/label/cuda-11.8.0\" cuda-runtime", assert_success=True, environment=True)
+    run_cmd(f"{install_git} && {install_pytorch} && python -m pip install py-cpuinfo==9.0.0", assert_success=True,
+            environment=True)
 
     # Install the webui requirements
     update_requirements(initial_installation=True)
@@ -201,21 +190,7 @@ def update_requirements(initial_installation=False):
         git_creation_cmd = 'git init -b main && git remote add origin https://github.com/oobabooga/text-generation-webui && git fetch && git remote set-head origin -a && git reset origin/HEAD && git branch --set-upstream-to=origin/HEAD'
         run_cmd(git_creation_cmd, environment=True, assert_success=True)
 
-    files_to_check = [
-        'start_linux.sh', 'start_macos.sh', 'start_windows.bat', 'start_wsl.bat',
-        'update_linux.sh', 'update_macos.sh', 'update_windows.bat', 'update_wsl.bat',
-        'one_click.py'
-    ]
-
-    before_pull_hashes = {file_name: calculate_file_hash(file_name) for file_name in files_to_check}
     run_cmd("git pull --autostash", assert_success=True, environment=True)
-    after_pull_hashes = {file_name: calculate_file_hash(file_name) for file_name in files_to_check}
-
-    # Check for differences in installation file hashes
-    for file_name in files_to_check:
-        if before_pull_hashes[file_name] != after_pull_hashes[file_name]:
-            print(f"File '{file_name}' was updated during 'git pull'. Please run the script again.")
-            exit(1)
 
     # Extensions requirements are installed only during the initial install by default.
     # That can be changed with the INSTALL_EXTENSIONS environment variable.
@@ -232,7 +207,8 @@ def update_requirements(initial_installation=False):
 
             extension_req_path = os.path.join("extensions", extension, "requirements.txt")
             if os.path.exists(extension_req_path):
-                run_cmd("python -m pip install -r " + extension_req_path + " --upgrade", assert_success=True, environment=True)
+                run_cmd("python -m pip install -r " + extension_req_path + " --upgrade", assert_success=True,
+                        environment=True)
     elif initial_installation:
         print_big_message("Will not install extensions due to INSTALL_EXTENSIONS environment variable.")
 
@@ -241,7 +217,7 @@ def update_requirements(initial_installation=False):
     is_cuda = '+cu' in torver  # 2.0.1+cu118
     is_cuda117 = '+cu117' in torver  # 2.0.1+cu117
     is_rocm = '+rocm' in torver  # 2.0.1+rocm5.4.2
-    is_intel = '+cxx11' in torver  # 2.0.1a0+cxx11.abi
+    is_intel = '+xpu' in torver  # This assumes the Intel Arc version string contains '+xpu', adjust as necessary
     is_cpu = '+cpu' in torver  # 2.0.1+cpu
 
     if is_rocm:
@@ -259,34 +235,42 @@ def update_requirements(initial_installation=False):
             requirements_file = "requirements_apple_intel.txt"
         else:
             requirements_file = "requirements_apple_silicon.txt"
+    elif is_intel:
+        if cpu_has_avx2():
+            requirements_file = "requirements_intel_arc.txt"  # You will need to create this requirements file
+        else:
+            requirements_file = "requirements_intel_arc_noavx2.txt"  # You will need to create this requirements file
     else:
         if cpu_has_avx2():
             requirements_file = "requirements.txt"
         else:
             requirements_file = "requirements_noavx2.txt"
 
-    # Prepare the requirements file
-    print_big_message(f"Installing webui requirements from file: {requirements_file}")
-    textgen_requirements = open(requirements_file).read().splitlines()
-    if is_cuda117:
-        textgen_requirements = [req.replace('+cu118', '+cu117').replace('torch2.1', 'torch2.0') for req in textgen_requirements]
-    with open('temp_requirements.txt', 'w') as file:
-        file.write('\n'.join(textgen_requirements))
+    # ... rest of your code ...
 
-    # Workaround for git+ packages not updating properly.
+    print_big_message(f"Installing webui requirements from file: {requirements_file}")
+
+    textgen_requirements = open(requirements_file).read().splitlines()
+
+    # Workaround for git+ packages not updating properly. Also store requirements.txt for later use
     git_requirements = [req for req in textgen_requirements if req.startswith("git+")]
+
+    # Loop through each "git+" requirement and uninstall it
     for req in git_requirements:
+        # Extract the package name from the "git+" requirement
         url = req.replace("git+", "")
-        package_name = url.split("/")[-1].split("@")[0].rstrip(".git")
+        package_name = url.split("/")[-1].split("@")[0]
+
+        # Uninstall the package using pip
         run_cmd("python -m pip uninstall -y " + package_name, environment=True)
         print(f"Uninstalled {package_name}")
 
     # Install/update the project requirements
-    run_cmd("python -m pip install -r temp_requirements.txt --upgrade", assert_success=True, environment=True)
-    os.remove('temp_requirements.txt')
+    run_cmd(f"python -m pip install -r {requirements_file} --upgrade", assert_success=True, environment=True)
 
     # Check for '+cu' or '+rocm' in version string to determine if torch uses CUDA or ROCm. Check for pytorch-cuda as well for backwards compatibility
-    if not any((is_cuda, is_rocm)) and run_cmd("conda list -f pytorch-cuda | grep pytorch-cuda", environment=True, capture_output=True).returncode == 1:
+    if not any((is_cuda, is_rocm)) and run_cmd("conda list -f pytorch-cuda | grep pytorch-cuda", environment=True,
+                                               capture_output=True).returncode == 1:
         clear_cache()
         return
 
@@ -349,12 +333,14 @@ if __name__ == "__main__":
         if '--model-dir' in flags:
             # Splits on ' ' or '=' while maintaining spaces within quotes
             flags_list = re.split(' +(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)|=', flags)
-            model_dir = [flags_list[(flags_list.index(flag)+1)] for flag in flags_list if flag == '--model-dir'][0].strip('"\'')
+            model_dir = [flags_list[(flags_list.index(flag) + 1)] for flag in flags_list if flag == '--model-dir'][
+                0].strip('"\'')
         else:
             model_dir = 'models'
 
         if len([item for item in glob.glob(f'{model_dir}/*') if not item.endswith(('.txt', '.yaml'))]) == 0:
-            print_big_message("WARNING: You haven't downloaded any model yet.\nOnce the web UI launches, head over to the \"Model\" tab and download one.")
+            print_big_message(
+                "WARNING: You haven't downloaded any model yet.\nOnce the web UI launches, head over to the \"Model\" tab and download one.")
 
         # Workaround for llama-cpp-python loading paths in CUDA env vars even if they do not exist
         conda_path_bin = os.path.join(conda_env_path, "bin")

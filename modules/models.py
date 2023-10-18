@@ -6,6 +6,7 @@ import traceback
 from pathlib import Path
 
 import torch
+import intel_extension_for_pytorch as ipex
 import transformers
 from accelerate import infer_auto_device_map, init_empty_weights
 from transformers import (
@@ -139,6 +140,8 @@ def huggingface_loader(model_name):
             model = model.to(device)
         elif hasattr(torch, 'xpu') and torch.xpu.is_available():
             model = model.to('xpu')
+            model = ipex.optimize(model)  # Optimize the model after transferring to xpu
+
         else:
             model = model.cuda()
 
@@ -232,6 +235,12 @@ def llamacpp_loader(model_name):
 
     logger.info(f"llama.cpp weights detected: {model_file}")
     model, tokenizer = LlamaCppModel.from_pretrained(model_file)
+
+ # Add the IPEX integration here
+    if hasattr(torch, 'xpu') and torch.xpu.is_available():
+        model = model.to('xpu')
+        model = ipex.optimize(model)  # Optimize the model after transferring to xpu
+
     return model, tokenizer
 
 
@@ -257,6 +266,13 @@ def llamacpp_HF_loader(model_name):
     )
 
     model = LlamacppHF.from_pretrained(model_name)
+
+ # Add the IPEX integration here
+    if hasattr(torch, 'xpu') and torch.xpu.is_available():
+        model = model.to('xpu')
+        model = ipex.optimize(model)  # Optimize the model after transferring to xpu
+
+
     return model, tokenizer
 
 
