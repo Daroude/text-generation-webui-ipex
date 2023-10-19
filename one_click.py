@@ -16,7 +16,7 @@ conda_env_path = os.path.join(script_dir, "installer_files", "env")
 # os.environ["HCC_AMDGPU_TARGET"] = 'gfx1030'
 
 # CLBLAST for llama.ccp for Intel Arc GPUs
-os.environ["LLAMA_CLBLAST"] = "ON"
+os.environ["DLLAMA_CLBLAST"] = "ON"
 
 
 # Command-line flags
